@@ -1,55 +1,54 @@
-# Eleições Digitais Offline-First — Backend do Grupo 6
+# Eleições Digitais — Backend Vercel + Supabase
 
-API Node.js + Express conectada ao Supabase para a eleição educacional simulada **Clube de Esportes**.
+Backend corrigido para funcionar como função serverless da Vercel e também localmente com Express.
 
-## Rotas
-- `GET /api/health` — testa conexão com o Supabase.
-- `GET /api/election` — informações da eleição.
-- `GET /api/candidates` e `GET /api/candidates/:id` — candidatos.
-- `GET /api/proposals` — propostas; filtro opcional `?candidate_id=ID`.
-- `POST /api/votes` — registra voto simulado e impede repetição da mesma sessão.
-- `GET /api/results` — apuração.
+## Rotas disponíveis
+
+- `GET /` — informações da API e rotas.
+- `GET /api/health` — verifica variáveis e consulta o Supabase.
+- `GET /api/election` — configuração da eleição.
+- `GET /api/candidates` — candidaturas.
+- `GET /api/candidates/:id` — candidatura e propostas.
+- `GET /api/proposals` — propostas; aceita `?candidate_id=ID`.
+- `POST /api/votes` — registra voto simulado, valida candidatura/eleição e impede repetição da chave de sessão.
+- `GET /api/results` — apuração agregada.
 - `GET /api/events` e `POST /api/events` — mural de atualizações.
 
-## 1. Preparar o banco
+## 1. Configure o Supabase
+
 1. Abra seu projeto em https://supabase.com/dashboard.
-2. Entre em **SQL Editor → New query**.
-3. Abra `supabase/schema.sql`, copie todo o conteúdo e cole no editor.
-4. Clique em **Run** e confira as tabelas no Table Editor.
+2. Vá a **SQL Editor → New query**.
+3. Abra `supabase/schema.sql`, copie tudo, cole no editor e clique **Run**.
+4. Em **Project Settings → API** (o nome pode variar), copie a **Project URL** e a chave secreta `service_role`/secret. Nunca use essa chave no front-end.
 
-## 2. Preencher o `.env`
-No Supabase, encontre **Project Settings → API** (a localização pode variar conforme a versão do painel). Copie a Project URL para `SUPABASE_URL` e a chave `service_role`/secret para `SUPABASE_SERVICE_ROLE_KEY`. Preencha `FRONTEND_ORIGIN` com a origem do Pages, por exemplo `https://SEU-USUARIO.github.io`.
+## 2. Publique o backend na Vercel
 
-**Segurança:** `.env` já vem com valores de exemplo para você substituir. Nunca suba o `.env` preenchido para o GitHub, nem coloque a service-role/secret key no front-end. O `.gitignore` exclui `.env`.
+1. Envie a pasta `backend` deste pacote para um repositório GitHub. Não envie um `.env` preenchido.
+2. Na Vercel, crie/import o projeto a partir desse repositório. Se o repositório contiver `frontend` e `backend`, em **Settings → Build and Deployment → Root Directory**, escolha `backend`.
+3. Em **Settings → Environment Variables**, crie estas variáveis para Production (e Preview se precisar):
+   - `SUPABASE_URL` = Project URL do Supabase.
+   - `SUPABASE_SERVICE_ROLE_KEY` = chave secreta/service_role do Supabase.
+   - `FRONTEND_ORIGIN` = origem do site do front-end, sem barra no final, por exemplo `https://seu-usuario.github.io`. Se o front também estiver na Vercel, use o domínio do front-end, não o domínio da API. Para mais de uma origem, separe por vírgulas.
+4. Faça **Redeploy** depois de salvar as variáveis.
+5. Abra `https://SEU-DOMINIO.vercel.app/api/health`. O esperado é `{"ok":true,"database":"connected"}`.
 
-## 3. Executar localmente
-Instale Node.js LTS se não tiver: https://nodejs.org/. Abra um terminal nesta pasta e rode:
+`vercel.json` reescreve as URLs `/api/...` para a função `api/index.js`, que despacha as rotas corretamente. Isso evita depender de `app.listen()` dentro de uma função serverless.
+
+## 3. Teste local (opcional)
+
+Na pasta `backend`, copie `.env.example` para `.env`, preencha as chaves, e rode:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Acesse `http://localhost:3000/api/health`. Resultado esperado: `{"ok":true,"database":"connected"}`. Se houver erro, revise URL/chave e confirme que executou o SQL.
+Abra `http://localhost:3000/api/health`.
 
-## 4. Testar as rotas
-Abra no navegador `http://localhost:3000/api/candidates`, `/api/proposals` e `/api/results`.
-Para testar voto, use Postman/Thunder Client ou outro cliente HTTP com `POST http://localhost:3000/api/votes` e JSON:
+## 4. Front-end
 
-```json
-{"candidate_id":1,"voter_key":"sessao-de-teste-12345"}
-```
+O `frontend/app.js` já usa `https://eleicoesdigitais-back.vercel.app` como base da API. O Service Worker envia os votos pendentes ao endpoint `/api/votes` e **só remove da fila os votos aceitos ou uma duplicidade confirmada**. Para uso offline, abra o site online ao menos uma vez para guardar as candidaturas reais do Supabase no cache do navegador.
 
-O `candidate_id` deve ser um ID existente retornado por `/api/candidates`. Repetir o mesmo `voter_key` deve retornar HTTP 409.
+## Segurança e limites
 
-## 5. Publicar o backend
-GitHub Pages hospeda somente arquivos estáticos; não executa Node.js. Publique este backend em um host Node (por exemplo Render ou Railway) e configure as variáveis `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `FRONTEND_ORIGIN`. O host normalmente fornece `PORT`. Depois, atualize o front-end para chamar a URL pública da API.
-
-## 6. Integração com o front-end offline-first
-Quando online, o front-end deve buscar candidatos/propostas em `GET /api/candidates` e `GET /api/proposals`. Para sincronizar voto pendente, envie o item do IndexedDB para `POST /api/votes` quando a rede voltar. Reutilize o mesmo `voter_key` nas tentativas, para evitar duplicidade. Este backend não altera automaticamente o JavaScript do site: a URL da API precisa ser conectada no `app.js` do front-end.
-
-## Limitações e segurança
-- Uso exclusivamente educacional; não usar em eleições reais.
-- A `service_role` ignora RLS e deve permanecer no servidor.
-- `voter_key` é uma proteção didática por sessão/navegador, não uma identidade forte.
-- `POST /api/events` está disponível para demonstração; em sistema real, proteja a criação de eventos com autenticação/autorização.
+Projeto didático com votos fictícios, não deve ser usado para eleições reais. A chave `SUPABASE_SERVICE_ROLE_KEY` dá acesso elevado e deve existir apenas nas variáveis de ambiente do backend. `voter_key` identifica uma sessão/navegador de forma didática, não é autenticação forte. Proteja a criação de eventos se for usar fora da sala de aula.
