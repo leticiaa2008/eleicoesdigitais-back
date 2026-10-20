@@ -1,5 +1,2 @@
-// Vercel serverless entry point. All routes are handled centrally by lib/api-handler.js.
-import apiHandler from '../lib/api-handler.js';
-export default async function handler(req, res) {
-  return apiHandler(req, res);
-}
+// Todas as rotas são encaminhadas pelo rewrite da Vercel para lib/api-handler.js.
+export { default } from '../lib/api-handler.js';

@@ -1,7 +1,13 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/", "destination": "/api/index?path=" },
-    { "source": "/api/(.*)", "destination": "/api/index?path=$1" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index?path=$1"
+    },
+    {
+      "source": "/",
+      "destination": "/api/index?path="
+    }
   ]
 }
